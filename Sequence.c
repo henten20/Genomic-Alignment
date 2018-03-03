@@ -4,28 +4,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
-
-#define g 2.0
-#define h 0.5
-
-
-// globally shared vectors for forward and reverse phases
-float *CC;
-float *DD;
-float *RR;
-float *SS;
-char *s;
-
-// Functional Prototypes
-double gap(int);
-float w(char, char);
-void alignment(char, int, int, char *, char *, float);
-float DIFF(char *, char *, int, int);
-float diff(char *, char *, int, int, int, int, float, float);
+#include "Sequence.h"
 
 // reverses the sequence with a given length
 void reverse(char *sequence, int length)
 {
+	if(sequence == NULL || length < 1)
+		return;
+		
 	char temp;
 	int i = 0, j = length - 1;
 	
@@ -39,32 +25,16 @@ void reverse(char *sequence, int length)
 	}
 }
 
-float minGapValue(char *sequenceA, char *sequenceB, int N, int aStart)
-{
-	//if(N == 0)
-		//return 0;
-	
-	float min = gap(0) + w(sequenceA[0], sequenceB[0]) + gap(N);
-
-	for(int j = 1; j <= N; j++)
-	{
-		if((gap(j - 1) + w(sequenceA[aStart], sequenceB[j]) + gap(N - j)) < min)
-			min = (gap(j - 1) + w(sequenceA[aStart], sequenceB[j]) + gap(N - j));
-	}
-	
-	printf("Min gap value: %f\n", min);
-	return min;
-}
-
 // gap penalty f
 double gap(int k)
 {
 	if (k > 0)
 		return g + h*k;
+	
 	return 0;
 }
 
-// takes in a set of parameters and returns the minimum of those parameters
+// return minimum of two given arguments
 float min2(float a, float b)
 {
 	if(a < b) return a;
@@ -72,6 +42,7 @@ float min2(float a, float b)
 	return b;
 }
 
+// return minimum of three given arguments
 float min3(float a, float b, float c)
 {
 	if(a < b && a < c)
@@ -82,6 +53,8 @@ float min3(float a, float b, float c)
 		return c;
 }
 
+// return the cost to convert a to b
+// 0 if they are equal.
 float w(char a, char b)
 {
 	if(a == b)
@@ -96,7 +69,6 @@ void alignment(char phase, int M, int N, char *sequenceA, char *sequenceB, float
 	float t;
 	float *array1, *array2;
 	
-	printf("Entering alignment calculation\n");
 	// 'F' or 'R' dictates a forward or reverse phase
 	if(phase == 'F')
 	{
@@ -109,9 +81,7 @@ void alignment(char phase, int M, int N, char *sequenceA, char *sequenceB, float
 		array2 = SS;
 	}
 	
-	// initialize the first index of CC[]
 	array1[0] = 0;
-	
 	t = g;
 	
 	for(int j = 1; j <= N; j++)
@@ -137,16 +107,15 @@ void alignment(char phase, int M, int N, char *sequenceA, char *sequenceB, float
 		{
 			e = min2(e, c + g) + h;
 			array2[j] = min2(array2[j], array1[j] + g) + h;
-			printf("%c - %c\n", sequenceA[i-1], sequenceB[j-1]);
-			
 			c = min3(array2[j], e, s + w(sequenceA[i-1], sequenceB[j-1]));
 			s = array1[j];
 			array1[j] = c;
 		}
-		printf("Cost is %.2f\n", array1[N]);
+		
+		//printf("Cost is %.2f\n", array1[N]);
 	}
+	
 	array2[0] = array1[0];
-	printf("Calculation done\n");
 }
 
 float DIFF(char *sequenceA, char *sequenceB, int M, int N)
@@ -158,82 +127,73 @@ float DIFF(char *sequenceA, char *sequenceB, int M, int N)
 // recursive procedure for diff
 float diff(char *sequenceA, char *sequenceB, int aStart, int bStart, int M, int N, float tb, float te)
 {
+	if(sequenceA == NULL || sequenceB == NULL)
+		return -1.0;
 	
-	printf("Calling diff with aStart: %d and bStart: %d\n", aStart, bStart);
-	// Denoted as i*, will be the half point index used to spli the array up
 	int i, j;
-	float first, second, inserted, deleted;
+	float forwardAlignment, reverseAlignment;
 	
 	if(N == 0)
 	{
 		if(M > 0)
 		{
-			printf("Delete A\n");
-			deleted = 1.0;
+			//printf("Delete A\n");
 			return 1.0;
 		}
 	}
 	
 	else if(M == 0)
 	{
-		printf("Insert B\n");
-		inserted = 1.0;
+		//printf("Insert B\n");
 		return 1.0;
 	}
 	
 	else if(M == 1)
 	{	
-		//printf("Conversion of cost min: %f\n", 
-			//min(2,
-				//(min(2, tb, te) + h) + gap(N), 
-					//minGapValue(sequenceA, sequenceB, N, aStart)
-		
 		float cost1 = (min2(tb, te) + h) + gap(N);
 		int type = 1;
 		
 		for(int j = 1; j <= N; j++)
 		{
-		
 			float cost2 = gap(j - 1) + w(sequenceA[aStart], sequenceB[bStart + j - 1]) + gap(N - 1);
 			
 			if(cost2 < cost1)
 				cost1 = cost2;
 		}
-		printf("Conversion cost of min: %f\n", cost1);
+		
+		//printf("Conversion of cost min is %f\n", cost1);
 		return cost1;
 	}
 	
 	else
 	{
-		// dividing i by 2
 		i = M/2;
-		printf("dividing i by 2. i* is now %d\n", i);
 		
-		// Compute CC and DD in a forward phase and reverse phases
-		printf("Cumputing CC and DD with M/N being %d/%d\n", i, N);
+		// Compute CC and DD in a forward phase
 		alignment('F', i, N, sequenceA, sequenceB, tb);
 
 		reverse(sequenceA, M);
 		reverse(sequenceB, N);
 		
-		printf("Cumputing RR and SS with M/N being %d/%d\n", i, N);
+		// Compute RR and SS in a reverse phase
 		alignment('R', M - i, N, sequenceA, sequenceB, te);
 		
 		reverse(sequenceA, M);
 		reverse(sequenceB, N);
 
 		// Find minimum value j
-		
 		j = 0;
-		float t1 = CC[0] + RR[N], t2 = DD[0] + SS[N] - g;
-		int type = (t1 < t2)? 1: 2;
+		
+		float t1 = CC[0] + RR[N];
+		float t2 = DD[0] + SS[N] - g;
 		float t3 = min2(t1, t2);
-
+		int type = (t1 < t2)? 1: 2;
+		
 		for(int x = 1; x <= N; x++)
 		{
 			t1 = CC[x] + RR[N - x]; 
 			t2 = DD[x] + SS[N - x] - g;
-			//t3 = min2(t1, t2);
+
 			float current_min = min2(t1, t2);
 			
 			if(current_min < t3)
@@ -242,70 +202,96 @@ float diff(char *sequenceA, char *sequenceB, int aStart, int bStart, int M, int 
 				t3 = current_min;
 				type = (t1 < t2)? 1: 2;
 			}
-
 		}
-		printf("Calculated j value: %d\n", j);
 		
 		if(type == 1)
 		{
-			first = diff(sequenceA, sequenceB, aStart, bStart, i, j, tb, g);
-			second = diff(sequenceA, sequenceB, aStart + i, bStart + j,  M - i, N - j, g, te);
+			forwardAlignment = diff(sequenceA, sequenceB, aStart, bStart, i, j, tb, g);
+			reverseAlignment = diff(sequenceA, sequenceB, aStart + i, bStart + j,  M - i, N - j, g, te);
 		}
 		else
 		{
-			first = diff(sequenceA, sequenceB, aStart, bStart, i - 1, j, tb, 0);
-			printf("Delete a\n");
-			second = diff(sequenceA, sequenceB, aStart + i, bStart + j, M - i - 1, N - j, 0, te);
+			forwardAlignment = diff(sequenceA, sequenceB, aStart, bStart, i - 1, j, tb, 0);
+			//printf("Delete A\n");
+			reverseAlignment = diff(sequenceA, sequenceB, aStart + i, bStart + j, M - i - 1, N - j, 0, te);
 		}
 		
-		return first + second;
+		return forwardAlignment + reverseAlignment;
+	}
+}
+
+int main(int argc, char *argv[]) 
+{
+	if(argc < 3)
+	{
+		printf("Incorrect format.\n");
+		return 0;
+	}
+
+	FILE *A, *B;
+	A = fopen(argv[1], "r");
+	B = fopen(argv[2], "r");
+	
+	if(A == NULL || B == NULL)
+	{
+		printf("Error in locating sequences.\n");
+		exit(1);
+	}
+
+	int M = 0, N = 0;
+	char seqA[MAX_MEM_USAGE], seqB[MAX_MEM_USAGE];
+	
+	fgets(seqA, MAX_MEM_USAGE, A);
+	fgets(seqB, MAX_MEM_USAGE, B);
+	
+	printf("%s\n", seqA);
+	printf("%s\n", seqB);
+	
+	for(int i = 0; ;i++)
+	{
+		if(seqA[i] == '\0')
+			break;
+		M++;
 	}
 	
-}
-
-void display(char *sequenceA, char  *sequenceB, int M, int N, float *S)
-{
-	;
-}
-
-int main(void) 
-{
-	// Global variable containing sequences A and B
-	// declaring some random DNA sequence
-	char sequenceA[5] = {'a', 'a', 'a', 'a', 'a'};
-	char sequenceB[4] = {'a', 'g', 'c', 't'};
+	for(int i = 0; ;i++)
+	{
+		if(seqB[i] == '\0')
+			break;
+		N++;
+	}
 	
-	int M = 5; 
-	int N = 4;
+	char *sequenceA = malloc(sizeof(char) * M);
+	char *sequenceB = malloc(sizeof(char) * N);
 	
-	char *S = malloc(sizeof(char) * M);
+	for(int i = 0; i < M; i++)
+		sequenceA[i] = seqA[i];
+	
+	for(int i = 0; i < N; i++)
+		sequenceB[i] = seqB[i];
+	
+	//char sequenceA[7] = {'a', 'a', 'a', 'a', 'a', 'a', 't'};
+	//char sequenceB[5] = {'a', 'a', 'c', 't', 'c'};
+	//char *S = malloc(sizeof(char) * M);
 	
 	// Allocate memory space to the four arrays
 	CC = malloc(sizeof(float) * M + 1);
 	DD = malloc(sizeof(float) * M + 1);
 	RR = malloc(sizeof(float) * N + 1);
 	SS = malloc(sizeof(float) * N + 1);
-	S = malloc(sizeof(float) * M + 1);
+	//S = malloc(sizeof(float) * M + 1);
 	
-	// Initiate main wrapper for DIFF
-	printf("Minimum conversion cost: %f\n" , DIFF(sequenceA, sequenceB, M, N));
+	printf("Minimum conversion cost: %.2f\n" , DIFF(sequenceA, sequenceB, M, N));
 	
+	free(sequenceA);
+	free(sequenceB);
 	free(CC);
 	free(DD);
 	free(RR);
 	free(SS);
 	
+	fclose(A);
+	fclose(B);
+	
 	return 0;
 }
-
-// Matching with a list of people pulled from the database
-// edit distance
-// deletes are replaced by gaps, 
-//  gap{k) = g + hk where g is the fixed cost to open up a gap, h is how much each
-// nucleotide costs to remove/delete, k is the number of nucleotides in the gap
-// DD is the cost to convert when ending with a deletion
-// CC is the cost of conversion - optimal cost of conversion
-// I is the cost of conversion when inserting at the last letter
-// D is the cost of deletion at the last letter 
-
-// i* is the midpoint of A, j* is the midpoint of B BUT i* doesn't change, j is what you're changing around
